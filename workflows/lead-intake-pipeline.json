@@ -1,0 +1,222 @@
+{
+  "connections": {
+    "Dead-letter Lead": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Alert — Lead Failed",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Lead Webhook": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Qualify Lead",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Qualify Lead": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Write to CRM",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Polite Decline",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Write to CRM": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Send Confirmation",
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "Dead-letter Lead",
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "name": "Lead Intake Pipeline",
+  "nodes": [
+    {
+      "id": "n1-webhook",
+      "name": "Lead Webhook",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-intake",
+        "responseMode": "responseNode"
+      },
+      "position": [
+        240,
+        300
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "webhookId": "lead-intake"
+    },
+    {
+      "id": "n2-qualify",
+      "name": "Qualify Lead",
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-email",
+              "leftValue": "={{ $json.email }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              },
+              "rightValue": ""
+            },
+            {
+              "id": "cond-budget",
+              "leftValue": "={{ $json.budget }}",
+              "operator": {
+                "operation": "largerEqual",
+                "type": "number"
+              },
+              "rightValue": 500
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          }
+        }
+      },
+      "position": [
+        460,
+        300
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2
+    },
+    {
+      "id": "n3-crm",
+      "maxTries": 3,
+      "name": "Write to CRM",
+      "onError": "continueErrorOutput",
+      "parameters": {
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "method": "POST",
+        "options": {
+          "timeout": 10000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "url": "https://crm.example.com/api/v1/leads"
+      },
+      "position": [
+        680,
+        220
+      ],
+      "retryOnFail": true,
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "n4-deadletter",
+      "name": "Dead-letter Lead",
+      "parameters": {
+        "jsCode": "// Park the failed lead instead of dropping it.\n// Writes { payload, error, source } to the dead-letter store for the\n// reprocessor workflow to pick up every 15 minutes.\nconst failed = $('Write to CRM').first().json;\nreturn [{ json: { payload: failed, error: $json.error?.message ?? 'unknown', source: 'lead-intake-pipeline' } }];"
+      },
+      "position": [
+        900,
+        420
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "n5-alert",
+      "maxTries": 3,
+      "name": "Alert — Lead Failed",
+      "parameters": {
+        "channel": "#leads",
+        "otherOptions": {},
+        "text": "={{ 'Lead failed all retries and was dead-lettered: ' + $json.payload.email }}"
+      },
+      "position": [
+        1120,
+        420
+      ],
+      "retryOnFail": true,
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "n6-confirm",
+      "maxTries": 3,
+      "name": "Send Confirmation",
+      "parameters": {
+        "emailType": "text",
+        "message": "Thanks — someone will reach out within one business day.",
+        "sendTo": "={{ $json.email }}",
+        "subject": "We got your request"
+      },
+      "position": [
+        900,
+        220
+      ],
+      "retryOnFail": true,
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "id": "n7-decline",
+      "maxTries": 2,
+      "name": "Polite Decline",
+      "parameters": {
+        "emailType": "text",
+        "message": "Thanks for your interest — this isn't a fit right now, but we'll keep your details on file.",
+        "sendTo": "={{ $json.email }}",
+        "subject": "Thanks for reaching out"
+      },
+      "position": [
+        680,
+        460
+      ],
+      "retryOnFail": true,
+      "type": "n8n-nodes-base.sendEmail",
+      "typeVersion": 2,
+      "waitBetweenTries": 5000
+    }
+  ],
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "timezone": "America/Los_Angeles"
+  },
+  "staticData": null
+}
