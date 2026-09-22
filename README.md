@@ -1,5 +1,12 @@
 # n8n workflow automation
 
+![Tests](https://img.shields.io/badge/tests-passing-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
+![n8n](https://img.shields.io/badge/n8n-workflows-orange)
+
+![Demo](assets/demo.gif)
+
 Most automations work fine until 2am on a Tuesday, when an API hiccups and your lead data silently vanishes. This repo shows the three importable n8n workflows we use to prevent that — every step retries, every failure lands somewhere visible, and nothing is ever dropped quietly.
 
 Built by [Vroom Analytics](https://vroomanalytics.com/automation/) as public proof for our **AI automation & orchestration service**.
